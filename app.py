@@ -88,22 +88,18 @@ elif menu == "📄 ATS Score":
     )
 
     if uploaded_file is None:
-
-        st.info("📂 Please upload your resume in PDF or DOCX format.")
-
+        st.info("📂 Please upload your resume.")
         st.stop()
 
     st.success("✅ Resume uploaded successfully!")
 
-    # =====================================
+    # ==========================================
     # Extract Resume Text
-    # =====================================
+    # ==========================================
 
     resume_text = ""
 
     if uploaded_file.type == "application/pdf":
-
-        import pdfplumber
 
         with pdfplumber.open(uploaded_file) as pdf:
 
@@ -115,9 +111,7 @@ elif menu == "📄 ATS Score":
 
                     resume_text += text + "\n"
 
-    elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-
-        from docx import Document
+    else:
 
         doc = Document(uploaded_file)
 
@@ -125,19 +119,18 @@ elif menu == "📄 ATS Score":
 
             resume_text += para.text + "\n"
 
-    else:
-
-        st.error("❌ Only PDF and DOCX files are supported.")
-
-        st.stop()
+    # Convert to lowercase
 
     resume_text = resume_text.lower()
 
-    # =====================================
+    # ==========================================
     # Resume Information
-    # =====================================
+    # ==========================================
 
-    import re
+    st.markdown("---")
+    st.subheader("👤 Resume Information")
+
+    # Name
 
     name = "Not Found"
 
@@ -153,31 +146,43 @@ elif menu == "📄 ATS Score":
 
             break
 
+    # Email
+
     email = "Not Found"
 
     email_match = re.search(
+
         r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+
         resume_text
+
     )
 
     if email_match:
 
         email = email_match.group()
 
+    # Phone
+
     phone = "Not Found"
 
     phone_match = re.search(
+
         r"(\+91[\-\s]?)?[6-9]\d{9}",
+
         resume_text
+
     )
 
     if phone_match:
 
         phone = phone_match.group()
 
+    # Education
+
     education = "Not Found"
 
-    education_list = [
+    education_keywords = [
 
         "b.tech",
         "b.e",
@@ -185,13 +190,13 @@ elif menu == "📄 ATS Score":
         "b.sc",
         "m.tech",
         "mca",
-        "m.sc",
         "mba",
+        "m.sc",
         "phd"
 
     ]
 
-    for edu in education_list:
+    for edu in education_keywords:
 
         if edu in resume_text:
 
@@ -199,20 +204,23 @@ elif menu == "📄 ATS Score":
 
             break
 
+    # Experience
+
     experience = "Fresher"
 
     exp_match = re.search(
-        r"(\d+)\+?\s*(years|year)",
+
+        r"(\d+)\+?\s*(year|years)",
+
         resume_text
+
     )
 
     if exp_match:
 
         experience = exp_match.group()
 
-    st.markdown("---")
-
-    st.subheader("👤 Resume Information")
+    # Display Resume Information
 
     col1, col2 = st.columns(2)
 
@@ -230,280 +238,277 @@ elif menu == "📄 ATS Score":
 
         st.info(f"💼 Experience\n\n{experience}")
 
-    # =====================================
-    # Skill Database
-    # =====================================
-        
+    st.markdown("---")
 
-# =====================================
-# Extract Skills
-# =====================================
+  # ==========================================
+  #skill Database
+  # ==========================================
+    # ==========================================
+    # Extract Skills
+    # ==========================================
 
-resume_skills = []
+    resume_skills = []
 
-for skill in skill_database:
+    for skill in skill_database:
 
-    if skill.lower() in resume_text:
+        if skill.lower() in resume_text:
 
-        resume_skills.append(skill)
+            resume_skills.append(skill)
 
-resume_skills = sorted(list(set(resume_skills)))
+    resume_skills = sorted(list(set(resume_skills)))
 
-st.session_state["resume_skills"] = resume_skills
+    # Save for Job Recommendation
+    st.session_state["resume_skills"] = resume_skills
 
+    # ==========================================
+    # Required Skills
+    # ==========================================
 
-# =====================================
-# Required Skills
-# =====================================
+    required_skills = [
 
-required_skills = [
-
-    "python",
-    "sql",
-    "excel",
-    "power bi",
-    "machine learning",
-    "statistics",
-    "git",
-    "pandas"
-
-]
-
-matched_skills = sorted(
-    list(set(resume_skills) & set(required_skills))
-)
-
-missing_skills = sorted(
-    list(set(required_skills) - set(resume_skills))
-)
-
-
-# =====================================
-# ATS Score
-# =====================================
-
-ats_score = int(
-    (len(matched_skills) / len(required_skills)) * 100
-)
-
-st.markdown("---")
-
-st.subheader("📊 ATS Score")
-
-st.metric(
-    "Overall ATS Score",
-    f"{ats_score}%"
-)
-
-st.progress(ats_score)
-
-
-# =====================================
-# Resume Strength
-# =====================================
-
-st.subheader("💪 Resume Strength")
-
-if ats_score >= 80:
-
-    st.success("🟢 Strong Resume")
-
-elif ats_score >= 60:
-
-    st.info("🟡 Good Resume")
-
-elif ats_score >= 40:
-
-    st.warning("🟠 Average Resume")
-
-else:
-
-    st.error("🔴 Weak Resume")
-
-
-# =====================================
-# Skills Found
-# =====================================
-
-st.markdown("---")
-
-st.subheader("🛠 Skills Found")
-
-if resume_skills:
-
-    st.success(", ".join(resume_skills))
-
-else:
-
-    st.error("No technical skills found.")
-
-
-# =====================================
-# Matched Skills
-# =====================================
-
-st.subheader("✅ Matched Skills")
-
-if matched_skills:
-
-    cols = st.columns(2)
-
-    for i, skill in enumerate(matched_skills):
-
-        cols[i % 2].success(skill.title())
-
-else:
-
-    st.warning("No matching skills found.")
-
-
-# =====================================
-# Missing Skills
-# =====================================
-
-st.subheader("❌ Missing Skills")
-
-if missing_skills:
-
-    cols = st.columns(2)
-
-    for i, skill in enumerate(missing_skills):
-
-        cols[i % 2].error(skill.title())
-
-else:
-
-    st.success("No missing skills.")
-
-
-# =====================================
-# Skill Distribution
-# =====================================
-
-st.markdown("---")
-
-chart = pd.DataFrame({
-
-    "Category": [
-
-        "Matched Skills",
-
-        "Missing Skills"
-
-    ],
-
-    "Count": [
-
-        len(matched_skills),
-
-        len(missing_skills)
+        "python",
+        "sql",
+        "excel",
+        "power bi",
+        "tableau",
+        "machine learning",
+        "statistics",
+        "git"
 
     ]
 
-})
-
-fig = px.pie(
-
-    chart,
-
-    values="Count",
-
-    names="Category",
-
-    title="Skill Distribution"
-
-)
-
-st.plotly_chart(
-
-    fig,
-
-    use_container_width=True
-
-)
-
-
-# =====================================
-# ATS Feedback
-# =====================================
-
-st.markdown("---")
-
-st.subheader("💡 ATS Feedback")
-
-if ats_score >= 80:
-
-    st.success(
-        "Excellent resume! Your profile matches most job requirements."
+    matched_skills = sorted(
+        list(set(resume_skills) & set(required_skills))
     )
 
-elif ats_score >= 60:
-
-    st.info(
-        "Good resume. Add the missing skills to improve your ATS score."
+    missing_skills = sorted(
+        list(set(required_skills) - set(resume_skills))
     )
 
-elif ats_score >= 40:
+    # ==========================================
+    # ATS Score
+    # ==========================================
 
-    st.warning(
-        "Average ATS score. Improve your technical skills and add more projects."
+    ats_score = int(
+        (len(matched_skills) / len(required_skills)) * 100
     )
 
-else:
+    st.subheader("📊 ATS Score")
 
-    st.error(
-        "Low ATS score. Add technical skills, projects and certifications."
+    st.metric(
+        "Overall ATS Score",
+        f"{ats_score}%"
     )
 
+    st.progress(ats_score)
 
-# =====================================
-# Resume Improvement Tips
-# =====================================
+    # ==========================================
+    # Resume Strength
+    # ==========================================
 
-st.markdown("---")
+    st.subheader("💪 Resume Strength")
 
-st.subheader("📌 Resume Improvement Tips")
+    if ats_score >= 80:
 
-tips = []
+        st.success("🟢 Strong Resume")
 
-if "python" not in resume_skills:
+    elif ats_score >= 60:
 
-    tips.append("✔ Learn Python")
+        st.info("🟡 Good Resume")
 
-if "sql" not in resume_skills:
+    elif ats_score >= 40:
 
-    tips.append("✔ Add SQL skills")
+        st.warning("🟠 Average Resume")
 
-if "power bi" not in resume_skills:
+    else:
 
-    tips.append("✔ Learn Power BI")
+        st.error("🔴 Weak Resume")
 
-if "git" not in resume_skills:
+    # ==========================================
+    # Skills Found
+    # ==========================================
 
-    tips.append("✔ Add Git/GitHub projects")
+    st.markdown("---")
 
-if "machine learning" not in resume_skills:
+    st.subheader("🛠 Skills Found")
 
-    tips.append("✔ Add Machine Learning projects")
+    if resume_skills:
 
-if "statistics" not in resume_skills:
+        st.success(", ".join(skill.title() for skill in resume_skills))
 
-    tips.append("✔ Strengthen Statistics concepts")
+    else:
 
-if "excel" not in resume_skills:
+        st.error("No technical skills detected.")
 
-    tips.append("✔ Mention Excel skills")
+    # ==========================================
+    # Matched Skills
+    # ==========================================
 
-if len(tips) == 0:
+    st.subheader("✅ Matched Skills")
 
-    st.success("🎉 Excellent Resume! Keep it updated.")
+    if matched_skills:
 
-else:
+        col1, col2 = st.columns(2)
 
-    for tip in tips:
+        for i, skill in enumerate(matched_skills):
 
-        st.write(tip)
+            if i % 2 == 0:
 
+                col1.success(skill.title())
+
+            else:
+
+                col2.success(skill.title())
+
+    else:
+
+        st.warning("No matching skills found.")
+
+    # ==========================================
+    # Missing Skills
+    # ==========================================
+
+    st.subheader("❌ Missing Skills")
+
+    if missing_skills:
+
+        col1, col2 = st.columns(2)
+
+        for i, skill in enumerate(missing_skills):
+
+            if i % 2 == 0:
+
+                col1.error(skill.title())
+
+            else:
+
+                col2.error(skill.title())
+
+    else:
+
+        st.success("Excellent! No missing skills.")
+
+    # ==========================================
+    # Skill Distribution
+    # ==========================================
+
+    st.markdown("---")
+
+    chart = pd.DataFrame({
+
+        "Category": [
+
+            "Matched Skills",
+
+            "Missing Skills"
+
+        ],
+
+        "Count": [
+
+            len(matched_skills),
+
+            len(missing_skills)
+
+        ]
+
+    })
+
+    fig = px.pie(
+
+        chart,
+
+        values="Count",
+
+        names="Category",
+
+        title="Skill Distribution"
+
+    )
+
+    st.plotly_chart(
+
+        fig,
+
+        use_container_width=True
+
+    )
+
+    # ==========================================
+    # ATS Feedback
+    # ==========================================
+
+    st.markdown("---")
+
+    st.subheader("💡 ATS Feedback")
+
+    if ats_score >= 80:
+
+        st.success(
+            "Excellent! Your resume is well optimized for ATS."
+        )
+
+    elif ats_score >= 60:
+
+        st.info(
+            "Good resume. Adding the missing skills can improve your score."
+        )
+
+    elif ats_score >= 40:
+
+        st.warning(
+            "Average ATS score. Add more technical skills and projects."
+        )
+
+    else:
+
+        st.error(
+            "Low ATS score. Improve your resume by adding technical skills, projects and certifications."
+        )
+
+    # ==========================================
+    # Resume Improvement Tips
+    # ==========================================
+
+    st.markdown("---")
+
+    st.subheader("📌 Resume Improvement Tips")
+
+    tips = []
+
+    if "python" not in resume_skills:
+        tips.append("✔ Learn Python")
+
+    if "sql" not in resume_skills:
+        tips.append("✔ Add SQL skills")
+
+    if "excel" not in resume_skills:
+        tips.append("✔ Improve Microsoft Excel")
+
+    if "power bi" not in resume_skills:
+        tips.append("✔ Learn Power BI")
+
+    if "tableau" not in resume_skills:
+        tips.append("✔ Learn Tableau")
+
+    if "git" not in resume_skills:
+        tips.append("✔ Add Git/GitHub projects")
+
+    if "machine learning" not in resume_skills:
+        tips.append("✔ Add Machine Learning projects")
+
+    if "statistics" not in resume_skills:
+        tips.append("✔ Improve Statistics knowledge")
+
+    if len(tips) == 0:
+
+        st.success("🎉 Excellent Resume! No major improvements needed.")
+
+    else:
+
+        for tip in tips:
+
+            st.write(tip)
 
 elif menu == "🧠 Skill Gap":
 
