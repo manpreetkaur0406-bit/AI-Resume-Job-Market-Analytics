@@ -1,694 +1,1013 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import plotly.express as px
 import joblib
-import re
 import pdfplumber
 
-from docx import Document
+try:
+    resume_df = pd.read_csv("resume_data.csv")
+    st.sidebar.success("✅ resume_data.csv loaded")
+except Exception as e:
+    st.sidebar.error(f"resume_data.csv: {e}")
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+try:
+    salary_df = pd.read_csv("ds_salaries.csv")
+    st.sidebar.success("✅ ds_salaries.csv loaded")
+except Exception as e:
+    st.sidebar.error(f"ds_salaries.csv: {e}")
 
+try:
+    jobs_df = pd.read_csv("DataAnalyst.csv.zip", compression="zip")
+    st.sidebar.success("✅ DataAnalyst.csv.zip loaded")
+except Exception as e:
+    st.sidebar.error(f"DataAnalyst.csv.zip: {e}")
 
-
-# ================= PAGE CONFIG =================
+try:
+    people_df = pd.read_csv("01_people.csv")
+    st.sidebar.success("✅ 01_people.csv loaded")
+except Exception as e:
+    st.sidebar.error(f"01_people.csv: {e}")
 
 st.set_page_config(
-    page_title="AI Resume  & Job Analytics",
+    page_title="AI Resume Screening & Job Market Analytics",
     page_icon="🤖",
     layout="wide"
 )
 
 
-
-# ================= LOAD DATA =================
-
-
-@st.cache_data
-def load_csv(file):
-
-    try:
-        return pd.read_csv(file)
-
-    except:
-
-        return pd.DataFrame()
-
-
-
-resume_df = load_csv(
-    "resume_data.csv"
-)
-
-salary_df = load_csv(
-    "ds_salaries.csv"
+menu = st.sidebar.radio(
+    "📌 Navigation",
+    [
+        "🏠 Home",
+        "📊 EDA",
+        "📄 ATS Score",
+        "💼 Job Recommendation",
+        "📈 Salary Analytics",
+        "💰 Salary Prediction",
+        "ℹ️ About"
+    ]
 )
 
 
+if menu == "🏠 Home":
+    st.title("🤖 AI Resume Screening & Job Market Analytics")
 
-try:
+    st.write("Welcome to my Final Year Data Analytics Project!")
 
-    jobs_df = pd.read_csv(
-        "DataAnalyst.csv.zip",
-        compression="zip"
+    st.markdown("""
+    ### 🚀 Features
+
+    - 📊 EDA
+    - 📄 ATS Score
+    - 🧠 Skill Gap Analysis
+    - 💼 Job Recommendation
+    - 💰 Salary Prediction
+    - 📈 Salary Analytics
+
+    👈 Choose a page from the sidebar.
+    """)
+
+elif menu == "📊 EDA":
+
+    st.title("📊 Exploratory Data Analysis")
+
+    st.dataframe(resume_df.head())
+    st.dataframe(salary_df.head())
+    st.dataframe(jobs_df.head())
+
+elif menu == "📄 ATS Score":
+
+    st.title("📄 ATS Resume Score")
+
+    uploaded_file = st.file_uploader(
+        "Upload Resume",
+        type=["pdf", "docx"],
+        help="Supported formats: PDF and DOCX"
     )
 
-except:
+    if uploaded_file is None:
 
-    jobs_df = pd.DataFrame()
+        st.info("📂 Please upload your resume in PDF or DOCX format.")
 
+        st.stop()
 
+    st.success("✅ Resume uploaded successfully!")
 
-# ================= MODEL =================
+    # =====================================
+    # Extract Resume Text
+    # =====================================
 
+    resume_text = ""
 
-@st.cache_resource
-def load_model():
+    if uploaded_file.type == "application/pdf":
 
-    try:
+        import pdfplumber
 
-        return joblib.load(
-            "salary_prediction_model.pkl"
-        )
-
-    except:
-
-        return None
-
-
-
-model = load_model()
-
-
-
-# ================= TEXT FUNCTIONS =================
-
-
-def clean_text(text):
-
-    text = str(text).lower()
-
-    text = re.sub(
-        "[^a-z ]",
-        " ",
-        text
-    )
-
-    return text
-
-
-
-def extract_text(file):
-
-    text=""
-
-
-    if file.name.endswith(".pdf"):
-
-        with pdfplumber.open(file) as pdf:
+        with pdfplumber.open(uploaded_file) as pdf:
 
             for page in pdf.pages:
 
-                text += page.extract_text() or ""
+                text = page.extract_text()
 
+                if text:
 
+                    resume_text += text + "\n"
 
-    elif file.name.endswith(".docx"):
+    elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
 
-        doc = Document(file)
+        from docx import Document
+
+        doc = Document(uploaded_file)
 
         for para in doc.paragraphs:
 
-            text += para.text
+            resume_text += para.text + "\n"
 
+    else:
 
-    return text
+        st.error("❌ Only PDF and DOCX files are supported.")
 
+        st.stop()
 
+    resume_text = resume_text.lower()
 
-# ================= ATS SCORE =================
+    # =====================================
+    # Resume Information
+    # =====================================
 
+    import re
 
-def calculate_ats(resume,job):
+    name = "Not Found"
 
+    lines = resume_text.split("\n")
 
-    vectorizer = TfidfVectorizer()
+    for line in lines:
 
+        line = line.strip()
 
-    vectors = vectorizer.fit_transform(
-        [
-            clean_text(resume),
-            clean_text(job)
-        ]
+        if len(line.split()) >= 2:
+
+            name = line.title()
+
+            break
+
+    email = "Not Found"
+
+    email_match = re.search(
+        r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+        resume_text
     )
 
+    if email_match:
 
-    score = cosine_similarity(
-        vectors[0],
-        vectors[1]
-    )[0][0]
+        email = email_match.group()
+
+    phone = "Not Found"
+
+    phone_match = re.search(
+        r"(\+91[\-\s]?)?[6-9]\d{9}",
+        resume_text
+    )
+
+    if phone_match:
+
+        phone = phone_match.group()
+
+    education = "Not Found"
+
+    education_list = [
+
+        "b.tech",
+        "b.e",
+        "bca",
+        "b.sc",
+        "m.tech",
+        "mca",
+        "m.sc",
+        "mba",
+        "phd"
+
+    ]
+
+    for edu in education_list:
+
+        if edu in resume_text:
+
+            education = edu.upper()
+
+            break
+
+    experience = "Fresher"
+
+    exp_match = re.search(
+        r"(\d+)\+?\s*(years|year)",
+        resume_text
+    )
+
+    if exp_match:
+
+        experience = exp_match.group()
+
+    st.markdown("---")
+
+    st.subheader("👤 Resume Information")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.info(f"👤 Name\n\n{name}")
+
+        st.info(f"📧 Email\n\n{email}")
+
+        st.info(f"📞 Phone\n\n{phone}")
+
+    with col2:
+
+        st.info(f"🎓 Education\n\n{education}")
+
+        st.info(f"💼 Experience\n\n{experience}")
+
+    # =====================================
+    # Skill Database
+    # =====================================
+        
+
+   # =====================================
+# Extract Skills
+# =====================================
+
+resume_skills = []
+
+for skill in skill_database:
+
+    if skill.lower() in resume_text:
+
+        resume_skills.append(skill)
+
+resume_skills = sorted(list(set(resume_skills)))
+
+st.session_state["resume_skills"] = resume_skills
 
 
-    return round(score*100,2)
+# =====================================
+# Required Skills
+# =====================================
 
+required_skills = [
 
-
-
-# ================= SKILLS =================
-
-
-skills_list=[
-
-"python",
-"sql",
-"machine learning",
-"data science",
-"statistics",
-"excel",
-"power bi",
-"tableau",
-"aws",
-"git",
-"nlp",
-"deep learning"
+    "python",
+    "sql",
+    "excel",
+    "power bi",
+    "machine learning",
+    "statistics",
+    "git",
+    "pandas"
 
 ]
 
+matched_skills = sorted(
+    list(set(resume_skills) & set(required_skills))
+)
+
+missing_skills = sorted(
+    list(set(required_skills) - set(resume_skills))
+)
 
 
-def extract_skills(text):
+# =====================================
+# ATS Score
+# =====================================
 
-    text=text.lower()
+ats_score = int(
+    (len(matched_skills) / len(required_skills)) * 100
+)
 
-    found=[]
+st.markdown("---")
 
+st.subheader("📊 ATS Score")
 
-    for skill in skills_list:
+st.metric(
+    "Overall ATS Score",
+    f"{ats_score}%"
+)
 
-        if skill in text:
-
-            found.append(skill)
-
-
-    return found
-
-
-
-
-# ================= JOB RECOMMENDATION =================
+st.progress(ats_score)
 
 
-def recommend_jobs(resume):
+# =====================================
+# Resume Strength
+# =====================================
+
+st.subheader("💪 Resume Strength")
+
+if ats_score >= 80:
+
+    st.success("🟢 Strong Resume")
+
+elif ats_score >= 60:
+
+    st.info("🟡 Good Resume")
+
+elif ats_score >= 40:
+
+    st.warning("🟠 Average Resume")
+
+else:
+
+    st.error("🔴 Weak Resume")
 
 
-    if jobs_df.empty:
+# =====================================
+# Skills Found
+# =====================================
 
-        return pd.DataFrame()
+st.markdown("---")
 
+st.subheader("🛠 Skills Found")
 
-    descriptions = jobs_df[
-        "Job Description"
-    ].astype(str).tolist()
+if resume_skills:
 
+    st.success(", ".join(resume_skills))
 
+else:
 
-    vectorizer=TfidfVectorizer()
-
-
-    matrix=vectorizer.fit_transform(
-        [resume]+descriptions
-    )
+    st.error("No technical skills found.")
 
 
-    similarity=cosine_similarity(
-        matrix[0],
-        matrix[1:]
-    )[0]
+# =====================================
+# Matched Skills
+# =====================================
+
+st.subheader("✅ Matched Skills")
+
+if matched_skills:
+
+    cols = st.columns(2)
+
+    for i, skill in enumerate(matched_skills):
+
+        cols[i % 2].success(skill.title())
+
+else:
+
+    st.warning("No matching skills found.")
 
 
-    result=jobs_df.copy()
+# =====================================
+# Missing Skills
+# =====================================
+
+st.subheader("❌ Missing Skills")
+
+if missing_skills:
+
+    cols = st.columns(2)
+
+    for i, skill in enumerate(missing_skills):
+
+        cols[i % 2].error(skill.title())
+
+else:
+
+    st.success("No missing skills.")
 
 
-    result["Match Score"]=(similarity*100).round(2)
+# =====================================
+# Skill Distribution
+# =====================================
 
+st.markdown("---")
 
-    return result.sort_values(
-        "Match Score",
-        ascending=False
-    ).head(10)
+chart = pd.DataFrame({
 
+    "Category": [
 
+        "Matched Skills",
 
+        "Missing Skills"
 
-# ================= SIDEBAR =================
+    ],
 
+    "Count": [
 
-menu=st.sidebar.radio(
+        len(matched_skills),
 
-"Navigation",
+        len(missing_skills)
 
-[
-"🏠 Home",
-"📊 EDA Dashboard",
-"📄 ATS Resume Checker",
-"🧠 Skill Gap Analysis",
-"💼 Job Recommendation",
-"📈 Salary Analytics",
-"💰 Salary Prediction",
-"ℹ️ About"
-]
+    ]
+
+})
+
+fig = px.pie(
+
+    chart,
+
+    values="Count",
+
+    names="Category",
+
+    title="Skill Distribution"
+
+)
+
+st.plotly_chart(
+
+    fig,
+
+    use_container_width=True
 
 )
 
 
+# =====================================
+# ATS Feedback
+# =====================================
 
-# ================= HOME =================
+st.markdown("---")
 
+st.subheader("💡 ATS Feedback")
 
-if menu=="🏠 Home":
+if ats_score >= 80:
 
+    st.success(
+        "Excellent resume! Your profile matches most job requirements."
+    )
 
-    st.title(
-        "🤖 AI Resume Screening & Job Market Analytics"
+elif ats_score >= 60:
+
+    st.info(
+        "Good resume. Add the missing skills to improve your ATS score."
+    )
+
+elif ats_score >= 40:
+
+    st.warning(
+        "Average ATS score. Improve your technical skills and add more projects."
+    )
+
+else:
+
+    st.error(
+        "Low ATS score. Add technical skills, projects and certifications."
     )
 
 
-    st.markdown(
-    """
+# =====================================
+# Resume Improvement Tips
+# =====================================
 
-    ### Smart Career Analytics Platform
+st.markdown("---")
 
+st.subheader("📌 Resume Improvement Tips")
 
-    Features:
+tips = []
 
-    ✅ Resume ATS Score
+if "python" not in resume_skills:
 
-    ✅ Skill Gap Detection
+    tips.append("✔ Learn Python")
 
-    ✅ AI Job Recommendation
+if "sql" not in resume_skills:
 
-    ✅ Salary Analysis
+    tips.append("✔ Add SQL skills")
 
-    ✅ Salary Prediction
+if "power bi" not in resume_skills:
 
+    tips.append("✔ Learn Power BI")
 
-    Built using Data Analytics + Machine Learning
+if "git" not in resume_skills:
 
+    tips.append("✔ Add Git/GitHub projects")
 
-    """
-    )
+if "machine learning" not in resume_skills:
 
+    tips.append("✔ Add Machine Learning projects")
 
+if "statistics" not in resume_skills:
 
-    col1,col2,col3=st.columns(3)
+    tips.append("✔ Strengthen Statistics concepts")
 
+if "excel" not in resume_skills:
 
-    col1.metric(
-        "Resume Dataset",
-        len(resume_df)
-    )
+    tips.append("✔ Mention Excel skills")
 
+if len(tips) == 0:
 
-    col2.metric(
-        "Jobs Available",
-        len(jobs_df)
-    )
+    st.success("🎉 Excellent Resume! Keep it updated.")
 
+else:
 
-    col3.metric(
-        "Salary Records",
-        len(salary_df)
-    )
+    for tip in tips:
 
-
-
+        st.write(tip)
 
 
-# ================= EDA =================
+elif menu == "🧠 Skill Gap":
 
+    st.title("🧠 Skill Gap Analysis")
+    
+elif menu == "💼 Job Recommendation":
 
-elif menu=="📊 EDA Dashboard":
+    st.title("💼 AI Job Recommendation")
 
+    # Check if resume has been uploaded
+    if "resume_skills" not in st.session_state:
 
-    st.title(
-        "📊 Exploratory Data Analysis"
-    )
-
-
-    if salary_df.empty:
-
-        st.warning(
-            "Salary dataset missing"
-        )
+        st.warning("📄 Please upload your resume first from the ATS Score page.")
 
     else:
 
+        candidate_skills = st.session_state["resume_skills"]
 
-        st.subheader(
-            "Salary Dataset"
-        )
+        # Remove duplicate skills
+        candidate_skills = list(set(candidate_skills))
 
+        st.subheader("✅ Resume Skills")
 
-        st.dataframe(
-            salary_df.head()
-        )
+        if len(candidate_skills) == 0:
 
+            st.error("❌ No technical skills found in your resume.")
+            st.stop()
 
-        fig=px.histogram(
+        st.write(", ".join(candidate_skills))
 
-            salary_df,
+        recommendations = []
 
-            x="salary_in_usd",
+        # Calculate Match Score
+        for _, row in jobs_df.iterrows():
 
-            title="Salary Distribution"
+            description = str(row["Job Description"]).lower()
 
-        )
+            score = 0
 
+            for skill in candidate_skills:
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
+                if skill.lower() in description:
+                    score += 1
 
+            recommendations.append(score)
 
+        jobs_df["Match Score"] = recommendations
 
+        # Keep only jobs with at least 2 matched skills
+        top_jobs = jobs_df[jobs_df["Match Score"] >= 2]
 
-# ================= ATS =================
+        if top_jobs.empty:
 
+            st.error("❌ No jobs recommended for your resume.")
 
-elif menu=="📄 ATS Resume Checker":
+        else:
 
+            top_jobs = top_jobs.sort_values(
+                by="Match Score",
+                ascending=False
+            ).head(10)
 
-    st.title(
-        "📄 AI ATS Resume Score"
-    )
+            st.success(f"🎯 {len(top_jobs)} Matching Jobs Found")
 
+            for _, row in top_jobs.iterrows():
 
-    uploaded=st.file_uploader(
+                match_percent = int(
+                    (row["Match Score"] / len(candidate_skills)) * 100
+                )
 
-        "Upload Resume",
+                if match_percent > 100:
+                    match_percent = 100
 
-        type=["pdf","docx"]
+                st.markdown("---")
 
-    )
+                st.subheader(f"💼 {row['Job Title']}")
 
+                st.write(f"🏢 Company : {row['Company Name']}")
+                st.write(f"📍 Location : {row['Location']}")
 
-    job_description=st.text_area(
+                st.progress(match_percent)
 
-        "Paste Job Description"
+                st.write(f"⭐ Match Score : {match_percent}%")
 
-    )
+                with st.expander("📄 View Job Description"):
+                    st.write(row["Job Description"])
+                    
 
+    
+elif menu == "📈 Salary Analytics":
 
+    st.title("📈 Salary Analytics Dashboard")
+    st.write("Explore salary trends in the Data Science job market.")
 
-    if uploaded and job_description:
+    # Remove unwanted column
+    salary_df = salary_df.drop(columns=["Unnamed: 0"], errors="ignore")
 
+    # Convert USD to INR
+    USD_TO_INR = 87
+    salary_df["salary_inr"] = salary_df["salary_in_usd"] * USD_TO_INR
 
-        resume_text=extract_text(
-            uploaded
-        )
+    st.markdown("---")
 
+    # ==============================
+    # KPI Cards
+    # ==============================
 
-        score=calculate_ats(
+    col1, col2, col3, col4 = st.columns(4)
 
-            resume_text,
-
-            job_description
-
-        )
-
-
+    with col1:
         st.metric(
-            "ATS Score",
-            f"{score}%"
+            "💰 Average Salary",
+            f"₹ {salary_df['salary_inr'].mean():,.0f}"
         )
 
-
-        st.subheader(
-            "Matched Skills"
+    with col2:
+        st.metric(
+            "📈 Highest Salary",
+            f"₹ {salary_df['salary_inr'].max():,.0f}"
         )
 
-
-        st.write(
-            extract_skills(resume_text)
+    with col3:
+        st.metric(
+            "📉 Lowest Salary",
+            f"₹ {salary_df['salary_inr'].min():,.0f}"
         )
 
+    with col4:
+        st.metric(
+            "🌍 Countries",
+            salary_df["company_location"].nunique()
+        )
 
+    st.markdown("---")
 
-# ================= SKILL GAP =================
+    # ==============================
+    # Dataset Preview
+    # ==============================
 
+    st.subheader("📄 Salary Dataset Preview")
+    st.dataframe(salary_df.head())
 
-elif menu=="🧠 Skill Gap Analysis":
+    # ==============================
+    # Average Salary by Experience
+    # ==============================
 
+    st.subheader("💼 Average Salary by Experience Level")
 
-    st.title(
-        "🧠 Skill Gap Analysis"
+    avg_salary = (
+        salary_df.groupby("experience_level")["salary_inr"]
+        .mean()
+        .reset_index()
     )
 
-
-    resume=st.text_area(
-        "Enter Resume Skills"
+    fig = px.bar(
+        avg_salary,
+        x="experience_level",
+        y="salary_inr",
+        color="salary_inr",
+        text_auto=".2s",
+        title="Average Salary by Experience Level"
     )
 
-
-    required=st.multiselect(
-
-        "Required Skills",
-
-        skills_list
-
+    fig.update_layout(
+        xaxis_title="Experience Level",
+        yaxis_title="Average Salary (₹)"
     )
 
+    st.plotly_chart(fig, use_container_width=True)
 
+    # ==============================
+    # Salary Distribution
+    # ==============================
 
-    if st.button("Analyze"):
+    st.subheader("📊 Salary Distribution")
 
-
-        user_skills=extract_skills(
-            resume
-        )
-
-
-        missing=list(
-
-            set(required)-set(user_skills)
-
-        )
-
-
-        st.success(
-            "Your Skills"
-        )
-
-        st.write(user_skills)
-
-
-        st.error(
-            "Missing Skills"
-        )
-
-        st.write(missing)
-
-
-
-
-
-# ================= JOB =================
-
-
-elif menu=="💼 Job Recommendation":
-
-
-    st.title(
-        "💼 AI Job Recommendation"
+    fig = px.histogram(
+        salary_df,
+        x="salary_inr",
+        nbins=30,
+        title="Salary Distribution"
     )
 
-
-    resume=st.text_area(
-        "Enter Resume"
+    fig.update_layout(
+        xaxis_title="Salary (₹)",
+        yaxis_title="Count"
     )
 
+    st.plotly_chart(fig, use_container_width=True)
 
-    if st.button(
-        "Find Jobs"
-    ):
+    # ==============================
+    # Top 10 Highest Paying Jobs
+    # ==============================
 
+    st.subheader("🏆 Top 10 Highest Paying Job Titles")
 
-        result=recommend_jobs(
-            resume
-        )
-
-
-        st.dataframe(
-            result
-        )
-
-
-
-
-
-# ================= SALARY =================
-
-
-elif menu=="📈 Salary Analytics":
-
-
-    st.title(
-        "📈 Salary Market Analysis"
+    top_jobs = (
+        salary_df.groupby("job_title")["salary_inr"]
+        .mean()
+        .sort_values(ascending=False)
+        .head(10)
+        .reset_index()
     )
 
-
-    if not salary_df.empty:
-
-
-        exp=salary_df.groupby(
-            "experience_level"
-        )[
-            "salary_in_usd"
-        ].mean().reset_index()
-
-
-
-        fig=px.bar(
-
-            exp,
-
-            x="experience_level",
-
-            y="salary_in_usd",
-
-            title="Average Salary"
-
-        )
-
-
-        st.plotly_chart(
-            fig
-        )
-
-
-
-# ================= PREDICTION =================
-
-
-elif menu=="💰 Salary Prediction":
-
-
-    st.title(
-        "💰 Salary Prediction"
+    fig = px.bar(
+        top_jobs,
+        x="salary_inr",
+        y="job_title",
+        orientation="h",
+        color="salary_inr",
+        text_auto=".2s"
     )
 
-
-    if model is None:
-
-        st.error(
-            "Model file missing"
-        )
-
-
-    else:
-
-
-        experience=st.number_input(
-            "Experience Level",
-            0,4
-        )
-
-
-        remote=st.number_input(
-            "Remote Ratio",
-            0,100
-        )
-
-
-        company=st.number_input(
-            "Company Size",
-            0,2
-        )
-
-
-        if st.button(
-            "Predict"
-        ):
-
-
-            data=pd.DataFrame(
-
-            [[
-            2025,
-            experience,
-            0,
-            10,
-            0,
-            20,
-            remote,
-            20,
-            company
-            ]],
-
-            columns=[
-            "work_year",
-            "experience_level",
-            "employment_type",
-            "job_title",
-            "salary_currency",
-            "employee_residence",
-            "remote_ratio",
-            "company_location",
-            "company_size"
-            ]
-
-            )
-
-
-            prediction=model.predict(data)
-
-
-            st.success(
-
-            f"Predicted Salary: ${prediction[0]:,.0f}"
-
-            )
-
-
-
-
-
-# ================= ABOUT =================
-
-
-elif menu=="ℹ️ About":
-
-
-    st.title(
-        "ℹ️ About Project"
+    fig.update_layout(
+        xaxis_title="Average Salary (₹)",
+        yaxis_title="Job Title"
     )
 
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ==============================
+    # Top Hiring Countries
+    # ==============================
+
+    st.subheader("🌍 Top Hiring Countries")
+
+    countries = (
+        salary_df["company_location"]
+        .value_counts()
+        .head(10)
+        .reset_index()
+    )
+
+    countries.columns = ["Country", "Jobs"]
+
+    fig = px.bar(
+        countries,
+        x="Country",
+        y="Jobs",
+        color="Jobs",
+        text_auto=True
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ==============================
+    # Remote Work Distribution
+    # ==============================
+
+    st.subheader("🏠 Remote Work Distribution")
+
+    remote = (
+        salary_df["remote_ratio"]
+        .value_counts()
+        .reset_index()
+    )
+
+    remote.columns = ["Remote Ratio", "Count"]
+
+    fig = px.pie(
+        remote,
+        names="Remote Ratio",
+        values="Count",
+        hole=0.4
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ==============================
+    # Company Size Distribution
+    # ==============================
+
+    st.subheader("🏢 Company Size Distribution")
+
+    company = (
+        salary_df["company_size"]
+        .value_counts()
+        .reset_index()
+    )
+
+    company.columns = ["Company Size", "Count"]
+
+    fig = px.pie(
+        company,
+        names="Company Size",
+        values="Count",
+        hole=0.4
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ==============================
+    # Employment Type
+    # ==============================
+
+    st.subheader("📋 Employment Type")
+
+    employment = (
+        salary_df["employment_type"]
+        .value_counts()
+        .reset_index()
+    )
+
+    employment.columns = ["Employment Type", "Count"]
+
+    fig = px.bar(
+        employment,
+        x="Employment Type",
+        y="Count",
+        color="Count",
+        text_auto=True
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ==============================
+    # Salary by Company Size
+    # ==============================
+
+    st.subheader("💵 Average Salary by Company Size")
+
+    company_salary = (
+        salary_df.groupby("company_size")["salary_inr"]
+        .mean()
+        .reset_index()
+    )
+
+    fig = px.bar(
+        company_salary,
+        x="company_size",
+        y="salary_inr",
+        color="salary_inr",
+        text_auto=".2s"
+    )
+
+    fig.update_layout(
+        xaxis_title="Company Size",
+        yaxis_title="Average Salary (₹)"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+elif menu == "💰 Salary Prediction":
+
+    st.title("💰 AI Salary Prediction")
 
     st.write(
-    """
+        "Estimate your expected annual salary in India based on your job role and experience."
+    )
 
-    ## AI Resume Screening & Job Market Analytics
+    st.markdown("---")
+
+    # ===============================
+    # User Inputs
+    # ===============================
+
+    job_role = st.selectbox(
+        "💼 Select Job Role",
+        [
+            "Data Analyst",
+            "Business Analyst",
+            "Data Scientist",
+            "Machine Learning Engineer",
+            "AI Engineer",
+            "Data Engineer",
+            "Python Developer",
+            "BI Developer"
+        ]
+    )
+
+    experience = st.slider(
+        "👨‍💻 Years of Experience",
+        0,
+        20,
+        0
+    )
+
+    st.markdown("---")
+
+    if st.button("💰 Predict Salary"):
+
+        # Base Salaries (Annual INR)
+
+        base_salary = {
+
+            "Data Analyst": 500000,
+            "Business Analyst": 600000,
+            "Data Scientist": 800000,
+            "Machine Learning Engineer": 900000,
+            "AI Engineer": 1000000,
+            "Data Engineer": 850000,
+            "Python Developer": 550000,
+            "BI Developer": 650000
+
+        }
+
+        salary = base_salary[job_role]
+
+        # Experience Increment
+
+        if experience == 0:
+            salary = salary
+
+        elif experience <= 2:
+            salary *= 1.20
+
+        elif experience <= 5:
+            salary *= 1.60
+
+        elif experience <= 8:
+            salary *= 2.20
+
+        elif experience <= 12:
+            salary *= 2.90
+
+        else:
+            salary *= 3.60
+
+        salary = int(salary)
+
+        monthly_salary = int(salary / 12)
+
+        lower = int(salary * 0.90)
+
+        upper = int(salary * 1.10)
+
+        st.success("🎉 Salary Prediction Completed")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            st.metric(
+                "Annual Salary",
+                f"₹ {salary:,.0f}"
+            )
+
+        with col2:
+
+            st.metric(
+                "Monthly Salary",
+                f"₹ {monthly_salary:,.0f}"
+            )
+
+        st.progress(100)
+
+        st.info(
+            f"📊 Estimated Salary Range : ₹ {lower:,.0f}  -  ₹ {upper:,.0f}"
+        )
+
+        st.markdown("---")
+
+        st.subheader("📋 Prediction Summary")
+
+        st.write(f"**Job Role :** {job_role}")
+
+        st.write(f"**Experience :** {experience} Years")
+
+        if experience == 0:
+
+            level = "Fresher"
+
+        elif experience <= 2:
+
+            level = "Junior"
+
+        elif experience <= 5:
+
+            level = "Mid-Level"
+
+        elif experience <= 8:
+
+            level = "Senior"
+
+        else:
+
+            level = "Expert"
+
+        st.write(f"**Experience Level :** {level}")
+
+        st.success(
+            "This prediction is based on current Data Science and Analytics salary trends in India."
+        )
 
 
-    Technologies:
+elif menu == "ℹ️ About":
 
+    st.title("ℹ️ About Project")
+
+    st.write("""
+    **AI Resume Screening & Job Market Analytics**
+
+    This project uses Data Analytics and Machine Learning to:
+
+    • Analyze resumes
+    • Calculate ATS scores
+    • Recommend jobs
+    • Analyze salary trends
+    • Predict salaries
+
+    **Technologies Used**
     - Python
     - Streamlit
     - Pandas
-    - Machine Learning
-    - NLP
+    - Scikit-learn
     - Plotly
-
-
-    Objective:
-
-    To build an intelligent platform that helps
-    candidates analyze resumes, find suitable jobs,
-    understand market salaries and improve skills.
-
-
-    """
-    )
+    
+    """)
