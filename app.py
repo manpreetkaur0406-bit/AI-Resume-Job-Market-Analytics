@@ -5,7 +5,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import plotly.express as px
 import joblib
 import pdfplumber
@@ -19,7 +18,7 @@ from docx import Document
 # ============================================================
 
 st.set_page_config(
-    page_title="AI Resume Screening & Job Market Analytics",
+    page_title="AI Career Analytics",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -30,9 +29,28 @@ st.set_page_config(
 # PROJECT CONFIGURATION
 # ============================================================
 
-# Currency conversion used for displaying salary data.
+APP_TITLE = "🤖 AI Resume Screening & Job Market Analytics"
+
 # Dataset salary is in USD.
+# We display salary in Indian Rupees.
 USD_TO_INR = 87
+
+
+# ============================================================
+# SESSION STATE
+# ============================================================
+
+if "resume_text" not in st.session_state:
+    st.session_state["resume_text"] = ""
+
+if "resume_skills" not in st.session_state:
+    st.session_state["resume_skills"] = []
+
+if "resume_profile" not in st.session_state:
+    st.session_state["resume_profile"] = {}
+
+if "ats_score" not in st.session_state:
+    st.session_state["ats_score"] = 0
 
 
 # ============================================================
@@ -48,7 +66,7 @@ SKILL_DATABASE = [
     "c",
     "c++",
 
-    # Data Analysis
+    # Data Analytics
     "sql",
     "excel",
     "power bi",
@@ -57,7 +75,7 @@ SKILL_DATABASE = [
     "data analysis",
     "data analytics",
 
-    # Data Science
+    # Data Science / AI
     "data science",
     "machine learning",
     "deep learning",
@@ -77,7 +95,7 @@ SKILL_DATABASE = [
     "azure",
     "google cloud",
 
-    # Tools
+    # Development / Tools
     "git",
     "github",
     "docker",
@@ -93,7 +111,7 @@ SKILL_DATABASE = [
 
 
 # ============================================================
-# REQUIRED SKILLS FOR DEFAULT ATS ANALYSIS
+# DEFAULT ATS SKILLS
 # ============================================================
 
 DEFAULT_REQUIRED_SKILLS = [
@@ -102,83 +120,92 @@ DEFAULT_REQUIRED_SKILLS = [
     "sql",
     "excel",
     "power bi",
-    "machine learning",
     "statistics",
-    "git",
-    "pandas"
+    "pandas",
+    "machine learning",
+    "git"
 
 ]
 
 
 # ============================================================
-# DATASET LOADING FUNCTION
+# DATASET LOADING
 # ============================================================
 
 @st.cache_data
-def load_datasets():
+def load_resume_data():
 
-    datasets = {}
-
-    # Resume Dataset
     try:
-        datasets["resume"] = pd.read_csv("resume_data.csv")
+        return pd.read_csv("resume_data.csv")
+
     except Exception:
-        datasets["resume"] = pd.DataFrame()
+        return pd.DataFrame()
 
-    # Salary Dataset
+
+@st.cache_data
+def load_salary_data():
+
     try:
-        datasets["salary"] = pd.read_csv("ds_salaries.csv")
+        return pd.read_csv("ds_salaries.csv")
+
     except Exception:
-        datasets["salary"] = pd.DataFrame()
+        return pd.DataFrame()
 
-    # Job Dataset
+
+@st.cache_data
+def load_job_data():
+
     try:
-        datasets["jobs"] = pd.read_csv(
+        return pd.read_csv(
             "DataAnalyst.csv.zip",
             compression="zip"
         )
-    except Exception:
-        datasets["jobs"] = pd.DataFrame()
 
-    # People Dataset
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data
+def load_people_data():
+
     try:
-        datasets["people"] = pd.read_csv("01_people.csv")
+        return pd.read_csv("01_people.csv")
+
     except Exception:
-        datasets["people"] = pd.DataFrame()
-
-    return datasets
+        return pd.DataFrame()
 
 
 # ============================================================
-# LOAD ALL DATASETS
+# LOAD DATASETS
 # ============================================================
 
-data = load_datasets()
+resume_df = load_resume_data()
 
-resume_df = data["resume"]
-salary_df = data["salary"]
-jobs_df = data["jobs"]
-people_df = data["people"]
+salary_df = load_salary_data()
+
+jobs_df = load_job_data()
+
+people_df = load_people_data()
 
 
 # ============================================================
-# SALARY DATA PREPARATION
+# PREPARE SALARY DATA
 # ============================================================
 
 if not salary_df.empty:
 
     salary_df = salary_df.copy()
 
-    # Remove unwanted index column if present
+    # Remove unwanted index column
     salary_df = salary_df.drop(
         columns=["Unnamed: 0"],
         errors="ignore"
     )
 
-    # Convert salary from USD to INR
+    # Convert USD → INR
     if "salary_in_usd" in salary_df.columns:
 
-        salary_df["salary_inr"] = (
+        salary_df["salary_in_inr"] = (
             salary_df["salary_in_usd"] * USD_TO_INR
         )
 
@@ -189,35 +216,57 @@ if not salary_df.empty:
 
 st.sidebar.title("🤖 AI Career Analytics")
 
-st.sidebar.markdown(
-    "### 📌 Project Navigation"
+st.sidebar.caption(
+    "Resume Screening • Job Recommendation • Salary Analytics"
 )
 
+st.sidebar.markdown("---")
 
-# Dataset status
+
+# ============================================================
+# DATASET STATUS
+# ============================================================
+
+st.sidebar.subheader("📂 Dataset Status")
+
 
 if not resume_df.empty:
-    st.sidebar.success("✅ Resume dataset loaded")
+
+    st.sidebar.success("✅ Resume dataset")
+
 else:
-    st.sidebar.warning("⚠ Resume dataset unavailable")
+
+    st.sidebar.warning("⚠️ Resume dataset not found")
 
 
 if not salary_df.empty:
-    st.sidebar.success("✅ Salary dataset loaded")
+
+    st.sidebar.success("✅ Salary dataset")
+
 else:
-    st.sidebar.warning("⚠ Salary dataset unavailable")
+
+    st.sidebar.warning("⚠️ Salary dataset not found")
 
 
 if not jobs_df.empty:
-    st.sidebar.success("✅ Job dataset loaded")
+
+    st.sidebar.success("✅ Job dataset")
+
 else:
-    st.sidebar.warning("⚠ Job dataset unavailable")
+
+    st.sidebar.warning("⚠️ Job dataset not found")
 
 
 if not people_df.empty:
-    st.sidebar.success("✅ People dataset loaded")
+
+    st.sidebar.success("✅ People dataset")
+
 else:
-    st.sidebar.warning("⚠ People dataset unavailable")
+
+    st.sidebar.warning("⚠️ People dataset not found")
+
+
+st.sidebar.markdown("---")
 
 
 # ============================================================
@@ -225,15 +274,281 @@ else:
 # ============================================================
 
 menu = st.sidebar.radio(
+
     "📌 Navigation",
+
     [
+
         "🏠 Home",
+
         "📊 EDA",
+
         "📄 ATS Score",
+
         "🧠 Skill Gap",
+
         "💼 Job Recommendation",
+
         "📈 Salary Analytics",
+
         "💰 Salary Prediction",
+
+        "📥 Resume Report",
+
         "ℹ️ About"
+
     ]
+
 )
+
+
+# ============================================================
+# HOME
+# ============================================================
+
+if menu == "🏠 Home":
+
+    st.title(APP_TITLE)
+
+    st.subheader(
+        "🎯 AI-powered resume analysis and career guidance"
+    )
+
+    st.write(
+        """
+        This application analyzes a candidate's resume,
+        identifies relevant skills, evaluates ATS compatibility,
+        finds skill gaps, recommends suitable jobs and provides
+        salary insights using historical job-market data.
+        """
+    )
+
+    st.markdown("---")
+
+    # --------------------------------------------------------
+    # Project Statistics
+    # --------------------------------------------------------
+
+    st.subheader("📊 Project Overview")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "📄 Resume Records",
+        len(resume_df)
+    )
+
+    col2.metric(
+        "💼 Job Records",
+        len(jobs_df)
+    )
+
+    col3.metric(
+        "💰 Salary Records",
+        len(salary_df)
+    )
+
+    col4.metric(
+        "🧠 Skills Tracked",
+        len(SKILL_DATABASE)
+    )
+
+    st.markdown("---")
+
+    # --------------------------------------------------------
+    # Main Features
+    # --------------------------------------------------------
+
+    st.subheader("🚀 Main Features")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        st.markdown(
+            """
+            ### 📄 Resume Analysis
+
+            Upload a PDF or DOCX resume and extract:
+
+            - Personal information
+            - Education
+            - Experience
+            - Skills
+            - Projects
+            - Certifications
+            """
+        )
+
+    with col2:
+
+        st.markdown(
+            """
+            ### 🎯 Career Intelligence
+
+            Analyze:
+
+            - ATS compatibility
+            - Skill gaps
+            - Suitable job roles
+            - Job matching
+            - Career opportunities
+            """
+        )
+
+    with col3:
+
+        st.markdown(
+            """
+            ### 💰 Salary Intelligence
+
+            Explore:
+
+            - Salary trends
+            - Experience-based salary
+            - Job-wise salary
+            - Salary prediction
+            - Market analytics
+
+            **All salaries are shown in ₹ INR.**
+            """
+        )
+
+    st.markdown("---")
+
+    st.info(
+        "👈 Select a module from the sidebar to start the analysis."
+    )
+
+
+# ============================================================
+# EDA PLACEHOLDER
+# ============================================================
+
+elif menu == "📊 EDA":
+
+    st.title("📊 Exploratory Data Analysis")
+
+    st.info(
+        "EDA module will be added in Part 3."
+    )
+
+
+# ============================================================
+# ATS PLACEHOLDER
+# ============================================================
+
+elif menu == "📄 ATS Score":
+
+    st.title("📄 ATS Resume Score")
+
+    st.info(
+        "Enhanced ATS Resume Analyzer will be added in Part 5."
+    )
+
+
+# ============================================================
+# SKILL GAP PLACEHOLDER
+# ============================================================
+
+elif menu == "🧠 Skill Gap":
+
+    st.title("🧠 Skill Gap Analysis")
+
+    st.info(
+        "Skill Gap Analysis will be added in Part 6."
+    )
+
+
+# ============================================================
+# JOB RECOMMENDATION PLACEHOLDER
+# ============================================================
+
+elif menu == "💼 Job Recommendation":
+
+    st.title("💼 AI Job Recommendation")
+
+    st.info(
+        "Explainable Job Recommendation will be added in Part 7."
+    )
+
+
+# ============================================================
+# SALARY ANALYTICS PLACEHOLDER
+# ============================================================
+
+elif menu == "📈 Salary Analytics":
+
+    st.title("📈 Salary Analytics")
+
+    st.info(
+        "Enhanced Salary Analytics will be added in Part 9."
+    )
+
+
+# ============================================================
+# SALARY PREDICTION PLACEHOLDER
+# ============================================================
+
+elif menu == "💰 Salary Prediction":
+
+    st.title("💰 Salary Prediction")
+
+    st.info(
+        "ML-based Salary Prediction will be added in Part 8."
+    )
+
+
+# ============================================================
+# RESUME REPORT PLACEHOLDER
+# ============================================================
+
+elif menu == "📥 Resume Report":
+
+    st.title("📥 Resume Analysis Report")
+
+    st.info(
+        "Downloadable Resume Report will be added in Part 10."
+    )
+
+
+# ============================================================
+# ABOUT
+# ============================================================
+
+elif menu == "ℹ️ About":
+
+    st.title("ℹ️ About the Project")
+
+    st.markdown(
+        """
+        ## 🤖 AI Resume Screening & Job Market Analytics
+
+        A final-year Data Analytics project that combines
+        resume analysis, ATS evaluation, skill-gap detection,
+        job recommendation and salary analytics.
+
+        ### Technologies
+
+        - Python
+        - Streamlit
+        - Pandas
+        - NumPy
+        - Plotly
+        - Scikit-learn
+        - PDFPlumber
+        - python-docx
+
+        ### Currency
+
+        Salary information is displayed in:
+
+        **🇮🇳 Indian Rupees (₹ INR)**
+
+        ### Project Goal
+
+        The goal is to help students understand their resume,
+        identify missing skills, discover suitable job roles
+        and understand salary trends.
+        """
+    )
