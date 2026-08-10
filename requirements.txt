@@ -9,3 +9,5 @@ joblib
 rapidfuzz
 PyPDF2
 pdfplumber
+python-docx
+openpyxl
